@@ -38,7 +38,14 @@ class TranslationViewModel: ObservableObject {
     // 语音合成
     private let speechSynthesizer = AVSpeechSynthesizer()
     
+    // 在 TranslationViewModel 类中添加 DeepSeek 翻译服务
+    private let deepSeekTranslator: DeepSeekTranslator
+    private var translationCancellable: AnyCancellable?
+    
     init() {
+        // 初始化 DeepSeek 翻译服务（不再需要传递 API 密钥）
+        self.deepSeekTranslator = DeepSeekTranslator()
+        
         self.sourceLanguage = availableLanguages[0] // 默认中文
         self.targetLanguage = availableLanguages[1] // 默认英语
         
@@ -233,28 +240,50 @@ class TranslationViewModel: ObservableObject {
         
         isTranslating = true
         
-        // 这里使用模拟翻译，实际应用中应该调用翻译API
-        // 例如 Apple 的 Translation 框架或第三方 API 如 Google Translate
-        simulateTranslation(text: transcription) { [weak self] translatedText in
-            guard let self = self else { return }
-            
-            DispatchQueue.main.async {
-                self.translation = translatedText
+        // 使用 DeepSeek 进行翻译
+        translationCancellable = deepSeekTranslator.translate(
+            text: transcription,
+            from: sourceLanguage.name,
+            to: targetLanguage.name
+        )
+        .receive(on: DispatchQueue.main)
+        .sink(
+            receiveCompletion: { [weak self] completion in
+                guard let self = self else { return }
+                
                 self.isTranslating = false
                 
-                // 添加到对话历史
-                let conversation = Conversation(
-                    sourceText: self.transcription,
-                    translatedText: translatedText,
-                    sourceLanguage: self.sourceLanguage,
-                    targetLanguage: self.targetLanguage
-                )
-                self.conversations.append(conversation)
+                if case .failure(let error) = completion {
+                    self.errorMessage = "翻译失败: \(error.localizedDescription)"
+                    // 如果 DeepSeek 翻译失败，可以回退到模拟翻译
+                    self.simulateTranslation(text: self.transcription) { translatedText in
+                        self.handleTranslationResult(translatedText)
+                    }
+                }
+            },
+            receiveValue: { [weak self] translatedText in
+                guard let self = self else { return }
                 
-                // 朗读翻译结果
-                self.speakTranslation()
+                self.handleTranslationResult(translatedText)
             }
-        }
+        )
+    }
+    
+    // 处理翻译结果的辅助方法
+    private func handleTranslationResult(_ translatedText: String) {
+        self.translation = translatedText
+        
+        // 添加到对话历史
+        let conversation = Conversation(
+            sourceText: self.transcription,
+            translatedText: translatedText,
+            sourceLanguage: self.sourceLanguage,
+            targetLanguage: self.targetLanguage
+        )
+        self.conversations.append(conversation)
+        
+        // 朗读翻译结果
+        self.speakTranslation()
     }
     
     // 模拟翻译过程（实际应用中应替换为真实的翻译API调用）

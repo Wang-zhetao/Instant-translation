@@ -13,31 +13,24 @@ struct ContentView: View {
     
     var body: some View {
         TabView(selection: $selectedTab) {
-            // 简化版视图（用于测试）
-            SimpleTranslationView()
-                .tabItem {
-                    Label("简化版", systemImage: "waveform")
-                }
-                .tag(0)
-            
-            // 完整版视图
+            // 只保留主要功能视图
             TranslationView()
                 .tabItem {
                     Label("翻译", systemImage: "mic")
                 }
-                .tag(1)
+                .tag(0)
             
             LanguageSelectionView()
                 .tabItem {
                     Label("语言", systemImage: "globe")
                 }
-                .tag(2)
+                .tag(1)
             
             SettingsView()
                 .tabItem {
                     Label("设置", systemImage: "gear")
                 }
-                .tag(3)
+                .tag(2)
         }
         .environmentObject(translationViewModel)
     }

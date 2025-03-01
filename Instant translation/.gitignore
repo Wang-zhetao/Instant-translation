@@ -1,0 +1,71 @@
+# Xcode
+#
+# gitignore 贡献者: remember to update Global/Xcode.gitignore, Objective-C.gitignore & Swift.gitignore
+
+## 用户设置
+xcuserdata/
+
+## 兼容性
+*.moved-aside
+*.xccheckout
+*.xcscmblueprint
+
+## 构建生成的文件
+build/
+DerivedData/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+## 各种设置
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+
+## 其他
+*.moved-aside
+*.xcuserstate
+
+## 忽略 Mac OS X 文件
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Swift Package Manager
+#
+# 添加此行以忽略所有 Swift Package Manager 的依赖项
+Packages/
+Package.pins
+Package.resolved
+.build/
+
+# CocoaPods
+#
+# 我们建议不要将 Pods 目录添加到 .gitignore 中。但是，如果你想这样做，请取消下面的注释
+# Pods/
+
+# Carthage
+#
+# 添加此行以忽略 Carthage 构建的框架
+Carthage/Build
+
+# fastlane
+#
+# 建议不要将 fastlane 的截图、生成的文件和辅助文件添加到版本控制中
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+
+# 环境变量文件
+.env
+.env.local
+.env.development
+.env.test
+.env.production 

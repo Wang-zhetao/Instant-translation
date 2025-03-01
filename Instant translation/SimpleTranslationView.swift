@@ -9,6 +9,7 @@ struct SimpleAlertItem: Identifiable {
 struct SimpleTranslationView: View {
     @StateObject private var viewModel = SimpleTranslationViewModel()
     @State private var alertItem: SimpleAlertItem? = nil
+    @State private var showDebugInfo = true // 默认显示调试信息
     
     var body: some View {
         VStack {
@@ -26,10 +27,15 @@ struct SimpleTranslationView: View {
                     .background(Color.gray.opacity(0.1))
                     .cornerRadius(10)
                     .padding(.horizontal)
+            } else {
+                Text("等待语音输入...")
+                    .foregroundColor(.gray)
+                    .padding()
             }
             
             Spacer()
             
+            // 录音按钮
             Button(action: {
                 viewModel.toggleRecording()
             }) {
@@ -49,14 +55,39 @@ struct SimpleTranslationView: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
             
-            if let debugMessage = viewModel.debugMessage {
-                Text("调试: \(debugMessage)")
-                    .font(.caption)
-                    .foregroundColor(.gray)
-                    .padding()
-            }
+            // 调试信息开关
+            Toggle("显示调试信息", isOn: $showDebugInfo)
+                .padding(.horizontal)
+                .padding(.top)
             
-            Spacer()
+            // 调试信息区域
+            if showDebugInfo {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Group {
+                            Text("调试信息:").fontWeight(.bold)
+                            Text("权限状态: \(viewModel.permissionStatus)")
+                            Text("录音状态: \(viewModel.isRecording ? "录音中" : "未录音")")
+                            Text("音频引擎: \(viewModel.isAudioEngineRunning ? "运行中" : "已停止")")
+                        }
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        
+                        Divider()
+                        
+                        if let debugMessage = viewModel.debugMessage {
+                            Text("最新消息: \(debugMessage)")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                    }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(10)
+                }
+                .frame(maxHeight: 150)
+                .padding()
+            }
         }
         .onReceive(viewModel.$errorMessage) { errorMessage in
             if let errorMessage = errorMessage {
