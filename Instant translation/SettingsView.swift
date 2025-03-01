@@ -21,12 +21,26 @@ struct SettingsView: View {
                     HStack {
                         Text("麦克风权限")
                         Spacer()
+                        if viewModel.microphonePermissionGranted {
+                            Text("已授权")
+                                .foregroundColor(.green)
+                        } else {
+                            Button("请求权限") {
+                                viewModel.requestPermissions()
+                            }
+                            .foregroundColor(.blue)
+                        }
+                    }
+                    
+                    HStack {
+                        Text("语音识别权限")
+                        Spacer()
                         if viewModel.hasPermission {
                             Text("已授权")
                                 .foregroundColor(.green)
                         } else {
                             Button("请求权限") {
-                                viewModel.requestSpeechAuthorization()
+                                viewModel.requestPermissions()
                             }
                             .foregroundColor(.blue)
                         }

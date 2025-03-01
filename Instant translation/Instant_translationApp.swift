@@ -12,7 +12,6 @@ struct Instant_translationApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environmentObject(TranslationViewModel())
         }
     }
 }

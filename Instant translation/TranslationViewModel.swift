@@ -26,6 +26,8 @@ class TranslationViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var hasPermission = false
     @Published var isTranslating = false
+    @Published var microphonePermissionGranted = false
+    @Published var debugMessage: String?
     
     // 语音识别
     private var speechRecognizer: SFSpeechRecognizer?
@@ -43,24 +45,73 @@ class TranslationViewModel: ObservableObject {
         // 设置语音识别器
         updateSpeechRecognizer()
         
-        // 请求语音识别权限
-        requestSpeechAuthorization()
+        // 请求所有必要的权限
+        initializePermissions()
     }
     
     private func updateSpeechRecognizer() {
         speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: sourceLanguage.code))
     }
     
-    // 请求语音识别权限
-    func requestSpeechAuthorization() {
-        // 确保在主线程请求权限
-        DispatchQueue.main.async {
-            SFSpeechRecognizer.requestAuthorization { status in
+    private func initializePermissions() {
+        requestPermissions()
+    }
+    
+    // 公共方法，用于从设置界面请求权限
+    func requestPermissions() {
+        // 请求麦克风权限
+        #if swift(>=5.9) && canImport(AVFAudio) && os(iOS)
+        if #available(iOS 17.0, *) {
+            // iOS 17+ 使用新的 API
+            AVAudioApplication.requestRecordPermission { [weak self] granted in
                 DispatchQueue.main.async {
-                    self.hasPermission = status == .authorized
-                    if !self.hasPermission {
-                        self.errorMessage = "需要语音识别权限才能使用此应用"
+                    self?.microphonePermissionGranted = granted
+                    if !granted {
+                        self?.errorMessage = "需要麦克风权限才能使用录音功能"
+                        self?.debugMessage = "麦克风权限被拒绝"
+                    } else {
+                        self?.debugMessage = "麦克风权限已授权"
                     }
+                }
+            }
+        } else {
+            // iOS 16 及以下使用旧的 API
+            AVAudioSession.sharedInstance().requestRecordPermission { [weak self] granted in
+                DispatchQueue.main.async {
+                    self?.microphonePermissionGranted = granted
+                    if !granted {
+                        self?.errorMessage = "需要麦克风权限才能使用录音功能"
+                        self?.debugMessage = "麦克风权限被拒绝"
+                    } else {
+                        self?.debugMessage = "麦克风权限已授权"
+                    }
+                }
+            }
+        }
+        #else
+        // 非 iOS 17 环境
+        AVAudioSession.sharedInstance().requestRecordPermission { [weak self] granted in
+            DispatchQueue.main.async {
+                self?.microphonePermissionGranted = granted
+                if !granted {
+                    self?.errorMessage = "需要麦克风权限才能使用录音功能"
+                    self?.debugMessage = "麦克风权限被拒绝"
+                } else {
+                    self?.debugMessage = "麦克风权限已授权"
+                }
+            }
+        }
+        #endif
+        
+        // 请求语音识别权限
+        SFSpeechRecognizer.requestAuthorization { [weak self] status in
+            DispatchQueue.main.async {
+                self?.hasPermission = status == .authorized
+                if status != .authorized {
+                    self?.errorMessage = "需要语音识别权限才能使用此应用"
+                    self?.debugMessage = "语音识别权限状态: \(status.rawValue)"
+                } else {
+                    self?.debugMessage = "语音识别权限已授权"
                 }
             }
         }
@@ -87,84 +138,46 @@ class TranslationViewModel: ObservableObject {
     
     // 开始录音和识别
     func startRecording() {
-        // 首先检查权限
-        guard hasPermission else {
-            errorMessage = "需要语音识别权限才能使用此功能"
+        debugMessage = "开始录音函数被调用"
+        
+        // 检查权限
+        guard microphonePermissionGranted && hasPermission else {
+            errorMessage = "需要麦克风和语音识别权限"
             return
         }
         
-        // 确保没有正在进行的识别任务
-        if recognitionTask != nil {
-            recognitionTask?.cancel()
-            recognitionTask = nil
-        }
+        // 停止任何正在进行的任务
+        stopRecording()
         
-        // 创建音频会话
+        // 设置音频会话
         let audioSession = AVAudioSession.sharedInstance()
         do {
-            try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
-            try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+            try audioSession.setCategory(.record)
+            try audioSession.setActive(true)
         } catch {
-            errorMessage = "设置音频会话失败: \(error.localizedDescription)"
+            errorMessage = "设置音频会话失败"
             return
         }
         
         // 创建识别请求
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
         
-        // 确保语音识别器已初始化
-        guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else {
-            errorMessage = "语音识别器不可用"
-            return
-        }
+        // 设置语音识别器
+        speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: sourceLanguage.code))
         
-        let inputNode = audioEngine.inputNode
-        
-        guard let recognitionRequest = recognitionRequest else {
+        guard let recognitionRequest = recognitionRequest, 
+              let speechRecognizer = speechRecognizer else {
             errorMessage = "无法创建语音识别请求"
             return
         }
         
-        // 配置请求
-        recognitionRequest.shouldReportPartialResults = true
-        
-        // 开始识别
-        recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
-            guard let self = self else { return }
-            
-            var isFinal = false
-            
-            if let result = result {
-                // 更新转录文本
-                DispatchQueue.main.async {
-                    self.transcription = result.bestTranscription.formattedString
-                }
-                isFinal = result.isFinal
-            }
-            
-            if error != nil || isFinal {
-                // 停止音频引擎
-                self.audioEngine.stop()
-                inputNode.removeTap(onBus: 0)
-                
-                self.recognitionRequest = nil
-                self.recognitionTask = nil
-                
-                DispatchQueue.main.async {
-                    self.isRecording = false
-                    
-                    // 如果有转录文本，则进行翻译
-                    if !self.transcription.isEmpty {
-                        self.translateText()
-                    }
-                }
-            }
-        }
-        
         // 配置音频
+        let inputNode = audioEngine.inputNode
         let recordingFormat = inputNode.outputFormat(forBus: 0)
+        
+        // 安装音频 tap
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
-            self.recognitionRequest?.append(buffer)
+            recognitionRequest.append(buffer)
         }
         
         // 启动音频引擎
@@ -173,11 +186,28 @@ class TranslationViewModel: ObservableObject {
         do {
             try audioEngine.start()
             isRecording = true
-            transcription = ""
-            translation = ""
+            
+            // 开始识别
+            recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
+                guard let self = self else { return }
+                
+                if let result = result {
+                    DispatchQueue.main.async {
+                        self.transcription = result.bestTranscription.formattedString
+                    }
+                }
+                
+                if error != nil || (result?.isFinal ?? false) {
+                    self.stopRecording()
+                    
+                    if !self.transcription.isEmpty {
+                        self.translateText()
+                    }
+                }
+            }
         } catch {
-            errorMessage = "音频引擎启动失败: \(error.localizedDescription)"
-            isRecording = false
+            errorMessage = "启动音频引擎失败"
+            stopRecording()
         }
     }
     
@@ -186,8 +216,15 @@ class TranslationViewModel: ObservableObject {
         if audioEngine.isRunning {
             audioEngine.stop()
             recognitionRequest?.endAudio()
-            isRecording = false
         }
+        
+        recognitionTask?.cancel()
+        
+        // 清理资源
+        recognitionRequest = nil
+        recognitionTask = nil
+        
+        isRecording = false
     }
     
     // 翻译文本
@@ -271,5 +308,10 @@ class TranslationViewModel: ObservableObject {
     // 清除对话历史
     func clearConversations() {
         conversations.removeAll()
+    }
+    
+    // 添加这个计算属性，使 audioEngine.isRunning 可以从视图访问
+    var isAudioEngineRunning: Bool {
+        return audioEngine.isRunning
     }
 } 
