@@ -3,6 +3,7 @@ import SwiftUI
 struct TranslationView: View {
     @EnvironmentObject var viewModel: TranslationViewModel
     @State private var isShowingHistory = false
+    @AppStorage("showDebugInfo") private var showDebugInfo = false
     
     var body: some View {
         NavigationView {
@@ -103,38 +104,30 @@ struct TranslationView: View {
                 }
                 .padding(.bottom, 30)
                 
-                VStack(alignment: .leading) {
-                    Text("调试信息:")
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .foregroundColor(.gray)
-                    
-                    if let debugMessage = viewModel.debugMessage {
-                        Text("• \(debugMessage)")
-                            .font(.caption)
-                            .foregroundColor(.gray)
+                if showDebugInfo {
+                    Group {
+                        Text("调试信息:")
+                        Text("• 语音识别权限: \(viewModel.hasPermission ? "已授权" : "未授权")")
+                            .foregroundColor(viewModel.hasPermission ? .green : .red)
+                        Text("• 麦克风: \(viewModel.microphonePermissionGranted ? "已授权" : "未授权")")
+                            .foregroundColor(viewModel.microphonePermissionGranted ? .green : .red)
+                        Text("• 语音识别: \(viewModel.hasPermission ? "已授权" : "未授权")")
+                            .foregroundColor(viewModel.hasPermission ? .green : .red)
+                        Text("• 录音状态: \(viewModel.isRecording ? "录音中" : "未录音")")
+                            .foregroundColor(viewModel.isRecording ? .green : .secondary)
+                        Text("• 音频引擎: \(viewModel.isAudioEngineRunning ? "运行中" : "已停止")")
+                            .foregroundColor(viewModel.isAudioEngineRunning ? .green : .secondary)
+                        if let debugMessage = viewModel.debugMessage {
+                            Text("• \(debugMessage)")
+                                .foregroundColor(.blue)
+                        }
                     }
-                    
-                    Text("• 麦克风: \(viewModel.microphonePermissionGranted ? "已授权" : "未授权")")
-                        .font(.caption)
-                        .foregroundColor(viewModel.microphonePermissionGranted ? .green : .red)
-                    
-                    Text("• 语音识别: \(viewModel.hasPermission ? "已授权" : "未授权")")
-                        .font(.caption)
-                        .foregroundColor(viewModel.hasPermission ? .green : .red)
-                    
-                    Text("• 录音状态: \(viewModel.isRecording ? "正在录音" : "未录音")")
-                        .font(.caption)
-                        .foregroundColor(viewModel.isRecording ? .red : .gray)
-                    
-                    Text("• 音频引擎: \(viewModel.isAudioEngineRunning ? "运行中" : "已停止")")
-                        .font(.caption)
-                        .foregroundColor(viewModel.isAudioEngineRunning ? .green : .gray)
+                    .font(.caption2)
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(8)
+                    .padding(.horizontal)
                 }
-                .padding()
-                .background(Color(.systemGray6))
-                .cornerRadius(10)
-                .padding(.horizontal)
             }
             .navigationTitle("实时翻译")
             .navigationBarItems(

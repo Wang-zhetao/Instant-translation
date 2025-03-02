@@ -8,6 +8,7 @@ struct SettingsView: View {
                                                KeychainHelper.getAPIKey(for: "DeepSeekAPI") ?? ""
     @State private var showAPIKeyAlert = false
     @State private var apiKeySaveMethod = "env" // "env" 或 "keychain"
+    @AppStorage("showDebugInfo") private var showDebugInfo = false
     
     var body: some View {
         NavigationView {
@@ -107,6 +108,12 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
+                }
+                
+                // 添加开发者选项部分
+                Section(header: Text("开发者选项")) {
+                    Toggle("显示调试信息", isOn: $showDebugInfo)
+                        .tint(.blue)
                 }
             }
             .navigationTitle("设置")
