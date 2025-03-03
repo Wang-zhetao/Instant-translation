@@ -165,13 +165,7 @@ class SimpleTranslationViewModel: ObservableObject {
         debugMessage = "设置语音识别..."
         
         // 创建识别请求
-        do {
-            recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
-        } catch {
-            debugMessage = "创建语音识别请求失败: \(error.localizedDescription)"
-            errorMessage = "无法创建语音识别请求"
-            return
-        }
+        recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
         
         guard let recognitionRequest = recognitionRequest else {
             debugMessage = "无法创建语音识别请求"
@@ -191,16 +185,10 @@ class SimpleTranslationViewModel: ObservableObject {
         debugMessage = "音频格式: \(recordingFormat.description)"
         
         // 安装音频 tap
-        do {
-            inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
-                self?.recognitionRequest?.append(buffer)
-            }
-            debugMessage = "音频 tap 安装成功"
-        } catch {
-            debugMessage = "安装音频 tap 失败: \(error.localizedDescription)"
-            errorMessage = "无法设置音频输入"
-            return
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
+            self?.recognitionRequest?.append(buffer)
         }
+        debugMessage = "音频 tap 安装成功"
         
         // 开始识别任务
         debugMessage = "启动语音识别任务..."

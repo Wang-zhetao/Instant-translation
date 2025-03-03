@@ -159,8 +159,9 @@ class TranslationViewModel: ObservableObject {
         // 设置音频会话
         let audioSession = AVAudioSession.sharedInstance()
         do {
-            try audioSession.setCategory(.record)
-            try audioSession.setActive(true)
+            try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
+            try audioSession.setPreferredIOBufferDuration(0.005) // 5ms buffer duration
+            try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
         } catch {
             errorMessage = "设置音频会话失败"
             return
@@ -180,10 +181,16 @@ class TranslationViewModel: ObservableObject {
         
         // 配置音频
         let inputNode = audioEngine.inputNode
-        let recordingFormat = inputNode.outputFormat(forBus: 0)
         
-        // 安装音频 tap
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
+        // 使用输入节点的原始格式
+        let recordingFormat = inputNode.outputFormat(forBus: 0)
+        debugMessage = "使用音频格式: \(recordingFormat.description)"
+        
+        // 移除现有的 tap
+        inputNode.removeTap(onBus: 0)
+        
+        // 安装音频 tap，使用较大的缓冲区
+        inputNode.installTap(onBus: 0, bufferSize: 4096, format: recordingFormat) { buffer, _ in
             recognitionRequest.append(buffer)
         }
         
@@ -222,6 +229,7 @@ class TranslationViewModel: ObservableObject {
     func stopRecording() {
         if audioEngine.isRunning {
             audioEngine.stop()
+            audioEngine.inputNode.removeTap(onBus: 0)
             recognitionRequest?.endAudio()
         }
         
@@ -271,19 +279,23 @@ class TranslationViewModel: ObservableObject {
     
     // 处理翻译结果的辅助方法
     private func handleTranslationResult(_ translatedText: String) {
-        self.translation = translatedText
-        
-        // 添加到对话历史
-        let conversation = Conversation(
-            sourceText: self.transcription,
-            translatedText: translatedText,
-            sourceLanguage: self.sourceLanguage,
-            targetLanguage: self.targetLanguage
-        )
-        self.conversations.append(conversation)
-        
-        // 朗读翻译结果
-        self.speakTranslation()
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            self.translation = translatedText
+            
+            // 添加到对话历史
+            let conversation = Conversation(
+                sourceText: self.transcription,
+                translatedText: translatedText,
+                sourceLanguage: self.sourceLanguage,
+                targetLanguage: self.targetLanguage
+            )
+            self.conversations.append(conversation)
+            
+            // 朗读翻译结果
+            self.speakTranslation()
+        }
     }
     
     // 模拟翻译过程（实际应用中应替换为真实的翻译API调用）
